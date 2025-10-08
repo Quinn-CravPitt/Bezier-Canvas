@@ -3,8 +3,8 @@ import BezierCanvas from "./BezierCanvas";
 
 function App() {
   return <BezierCanvas />;
-}
-<div style={{ marginTop: 20, textAlign: "center" }}>
+
+  <div style={{ marginTop: 20, textAlign: "center" }}>
   <h3>How to Use This App</h3>
   <div style={{ maxWidth: 560, margin: "0 auto" }}>
     <iframe
@@ -19,5 +19,7 @@ function App() {
     ></iframe>
   </div>
 </div>
+}
+
 
 export default App;
