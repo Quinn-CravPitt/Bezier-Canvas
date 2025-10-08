@@ -32,9 +32,10 @@ const BezierCanvas = () => {
     return [start, c1, c2, end];
   };
 
-  useEffect(() => {
+useEffect(() => {
   setPoints(createInitialCurve());
-}, [canvasHeightInches, canvasWidthInches, createInitialCurve]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [canvasHeightInches, canvasWidthInches]);
 
   const bezierPoint = (t, p0, p1, p2, p3) => {
     const u = 1 - t;
