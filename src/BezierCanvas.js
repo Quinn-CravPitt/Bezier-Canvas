@@ -8,7 +8,7 @@ export default function BezierCanvas() {
   const [canvasHeightInches, setCanvasHeightInches] = useState(8);
   const [canvasWidthInches, setCanvasWidthInches] = useState(3);
   const [points, setPoints] = useState([]);
-  const [draggingPointIndex, setDraggingPointIndex] = useState(null);
+  const [dragging, setDragging] = useState(null);
 
   const canvasHeight = canvasHeightInches * INCH_TO_PX;
   const canvasWidth = canvasWidthInches * INCH_TO_PX;
@@ -16,13 +16,21 @@ export default function BezierCanvas() {
   const topLine = 0;
   const bottomLine = canvasHeight;
 
-  // Initialize curve
+  // Initialize curve with one segment
   const createInitialCurve = useCallback(() => {
-    const start = { x: canvasWidth / 2, y: topLine + 50 };
-    const end = { x: canvasWidth / 2, y: bottomLine - 50 };
-    const control1 = { x: start.x - 50, y: start.y + 100 };
-    const control2 = { x: end.x + 50, y: end.y - 100 };
-    return [{ start, control1, control2, end }];
+    const start = {
+      x: canvasWidth / 2,
+      y: topLine + 50,
+      cp1: { x: canvasWidth / 2 - 50, y: topLine + 150 },
+      cp2: { x: canvasWidth / 2 + 50, y: bottomLine - 150 },
+    };
+    const end = {
+      x: canvasWidth / 2,
+      y: bottomLine - 50,
+      cp1: { x: canvasWidth / 2 - 50, y: bottomLine - 150 },
+      cp2: { x: canvasWidth / 2 + 50, y: bottomLine - 50 },
+    };
+    return [start, end];
   }, [canvasWidth, topLine, bottomLine]);
 
   useEffect(() => {
@@ -34,7 +42,7 @@ export default function BezierCanvas() {
     const ctx = canvasRef.current.getContext("2d");
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-    // Draw dashed lines
+    // Draw top/bottom dashed lines
     ctx.strokeStyle = "gray";
     ctx.setLineDash([5, 5]);
     ctx.beginPath();
@@ -46,29 +54,55 @@ export default function BezierCanvas() {
     ctx.setLineDash([]);
 
     // Draw Bezier curve
-    points.forEach((curve) => {
-      ctx.strokeStyle = "black";
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    points.forEach((p, i) => {
+      if (i === 0) {
+        ctx.moveTo(p.x, p.y);
+      } else {
+        const prev = points[i - 1];
+        ctx.bezierCurveTo(
+          prev.cp2.x,
+          prev.cp2.y,
+          p.cp1.x,
+          p.cp1.y,
+          p.x,
+          p.y
+        );
+      }
+    });
+    ctx.stroke();
+
+    // Draw connecting lines to handles and points
+    points.forEach((p) => {
+      ctx.strokeStyle = "lightgray";
       ctx.beginPath();
-      ctx.moveTo(curve.start.x, curve.start.y);
-      ctx.bezierCurveTo(
-        curve.control1.x,
-        curve.control1.y,
-        curve.control2.x,
-        curve.control2.y,
-        curve.end.x,
-        curve.end.y
-      );
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.cp1.x, p.cp1.y);
       ctx.stroke();
 
-      // Draw control points
-      [curve.start, curve.control1, curve.control2, curve.end].forEach(
-        (p) => {
-          ctx.fillStyle = "blue";
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      );
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.cp2.x, p.cp2.y);
+      ctx.stroke();
+    });
+
+    // Draw anchor points
+    points.forEach((p) => {
+      ctx.fillStyle = "blue";
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "red";
+      ctx.beginPath();
+      ctx.arc(p.cp1.x, p.cp1.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(p.cp2.x, p.cp2.y, 4, 0, Math.PI * 2);
+      ctx.fill();
     });
   }, [points, canvasWidth, canvasHeight, topLine, bottomLine]);
 
@@ -76,73 +110,86 @@ export default function BezierCanvas() {
     draw();
   }, [draw]);
 
-  // Utility: get mouse position
   const getMousePos = (e) => {
     const rect = canvasRef.current.getBoundingClientRect();
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
 
-  // Check if click is near curve (simple approximation)
-  const isNearCurve = (x, y, curve) => {
-    // We'll just check distance to start, control1, control2, and end
-    const threshold = 10;
-    return [curve.start, curve.control1, curve.control2, curve.end].some(
-      (p) => Math.hypot(p.x - x, p.y - y) < threshold
-    );
-  };
-
-  // Add extra point on curve
-  const handleCanvasClick = (e) => {
-    const { x, y } = getMousePos(e);
-    const curve = points[0]; // only one continuous curve
-
-    if (isNearCurve(x, y, curve)) {
-      // Create a new control point in the middle
-      const newControl = { x, y };
-      setPoints((prev) => {
-        const updated = [...prev];
-        // insert new point as control2 of start for demo purposes
-        updated[0].control2 = newControl;
-        return updated;
-      });
-    }
-  };
-
-  // Handle drag start
   const handleMouseDown = (e) => {
     const { x, y } = getMousePos(e);
-    points.forEach((curve, index) => {
-      [curve.start, curve.control1, curve.control2, curve.end].forEach(
-        (p, i) => {
-          if (Math.hypot(p.x - x, p.y - y) < 6) {
-            setDraggingPointIndex({ curveIndex: index, pointIndex: i });
-          }
-        }
-      );
+    points.forEach((p, i) => {
+      const handles = ["x", "y"];
+      // check anchor
+      if (Math.hypot(p.x - x, p.y - y) < 6) {
+        setDragging({ pointIndex: i, type: "anchor" });
+      }
+      // check cp1
+      if (Math.hypot(p.cp1.x - x, p.cp1.y - y) < 4) {
+        setDragging({ pointIndex: i, type: "cp1" });
+      }
+      // check cp2
+      if (Math.hypot(p.cp2.x - x, p.cp2.y - y) < 4) {
+        setDragging({ pointIndex: i, type: "cp2" });
+      }
     });
   };
 
   const handleMouseMove = (e) => {
-    if (draggingPointIndex === null) return;
+    if (!dragging) return;
     const { x, y } = getMousePos(e);
     setPoints((prev) => {
       const updated = [...prev];
-      const curve = updated[draggingPointIndex.curveIndex];
-      const keys = ["start", "control1", "control2", "end"];
-      curve[keys[draggingPointIndex.pointIndex]] = { x, y };
+      const p = updated[dragging.pointIndex];
+      if (dragging.type === "anchor") p.x = x, p.y = y;
+      if (dragging.type === "cp1") p.cp1.x = x, p.cp1.y = y;
+      if (dragging.type === "cp2") p.cp2.x = x, p.cp2.y = y;
       return updated;
     });
   };
 
   const handleMouseUp = () => {
-    setDraggingPointIndex(null);
+    setDragging(null);
   };
 
-  // Export SVG
+  // Insert new point on curve
+  const handleCanvasClick = (e) => {
+    const { x, y } = getMousePos(e);
+    // find nearest segment
+    let minDist = Infinity;
+    let insertIndex = 1;
+    for (let i = 1; i < points.length; i++) {
+      const midX = (points[i - 1].x + points[i].x) / 2;
+      const midY = (points[i - 1].y + points[i].y) / 2;
+      const dist = Math.hypot(midX - x, midY - y);
+      if (dist < minDist) {
+        minDist = dist;
+        insertIndex = i;
+      }
+    }
+    const prev = points[insertIndex - 1];
+    const next = points[insertIndex];
+    const newPoint = {
+      x,
+      y,
+      cp1: { x: x - 30, y: y },
+      cp2: { x: x + 30, y: y },
+    };
+    setPoints((prevPoints) => {
+      const updated = [...prevPoints];
+      updated.splice(insertIndex, 0, newPoint);
+      return updated;
+    });
+  };
+
+  const resetCanvas = () => setPoints(createInitialCurve());
+
   const exportSVG = () => {
-    const curve = points[0];
     let svg = `<svg width="${canvasWidth}" height="${canvasHeight}" xmlns="http://www.w3.org/2000/svg">`;
-    svg += `<path d="M ${curve.start.x} ${curve.start.y} C ${curve.control1.x} ${curve.control1.y}, ${curve.control2.x} ${curve.control2.y}, ${curve.end.x} ${curve.end.y}" stroke="black" fill="none"/>`;
+    points.forEach((p, i) => {
+      if (i === 0) return;
+      const prev = points[i - 1];
+      svg += `<path d="M ${prev.x} ${prev.y} C ${prev.cp2.x} ${prev.cp2.y}, ${p.cp1.x} ${p.cp1.y}, ${p.x} ${p.y}" stroke="black" fill="none"/>`;
+    });
     svg += `</svg>`;
     const blob = new Blob([svg], { type: "image/svg+xml" });
     const link = document.createElement("a");
@@ -150,8 +197,6 @@ export default function BezierCanvas() {
     link.download = "bezier_curve.svg";
     link.click();
   };
-
-  const resetCanvas = () => setPoints(createInitialCurve());
 
   return (
     <div style={{ textAlign: "center" }}>
@@ -181,18 +226,20 @@ export default function BezierCanvas() {
           />
         </label>
       </div>
-
       <canvas
         ref={canvasRef}
         width={canvasWidth}
         height={canvasHeight}
-        style={{ border: "1px solid black", marginTop: "20px", cursor: "pointer" }}
+        style={{
+          border: "1px solid black",
+          marginTop: "20px",
+          cursor: "pointer",
+        }}
         onClick={handleCanvasClick}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
       />
-
       <div style={{ marginTop: "10px" }}>
         <button onClick={resetCanvas}>Reset</button>
         <button onClick={exportSVG} style={{ marginLeft: "10px" }}>
