@@ -3,14 +3,22 @@ import BezierCanvas from "./BezierCanvas";
 
 function App() {
   return (
-    <div>
-      {/* Your canvas component */}
-      <BezierCanvas />
+    <div style={{ padding: 20 }}>
+      <h2 style={{ textAlign: "center" }}>Bezier Curve Drawer</h2>
 
-      {/* Section for the demonstration video */}
-      <div style={{ marginTop: 20, textAlign: "center" }}>
-        <h3>How to Use This App</h3>
-        <div style={{ maxWidth: 560, margin: "0 auto" }}>
+      {/* Flex container for canvas + video */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "flex-start",
+          gap: "20px", // space between canvas and video
+          flexWrap: "wrap", // allows stacking on smaller screens
+        }}
+      >
+        {/* Video section */}
+        <div style={{ flex: "0 0 560px" }}>
+          <h3 style={{ textAlign: "center" }}>How to Use This App</h3>
           <iframe
             width="100%"
             height="315"
@@ -21,6 +29,11 @@ function App() {
             referrerPolicy="strict-origin-when-cross-origin"
             allowFullScreen
           ></iframe>
+        </div>
+
+        {/* Canvas section */}
+        <div>
+          <BezierCanvas />
         </div>
       </div>
     </div>
