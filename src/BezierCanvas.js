@@ -116,39 +116,39 @@ const BezierCanvas = () => {
     };
   };
 
-  const handleMouseDown = (e) => {
-    const pos = getMousePos(e);
-    // Check if clicking near an existing point or control point
-    for (let i = 0; i < points.length; i++) {
-      const p = points[i];
-      if (Math.hypot(pos.x - p.x, pos.y - p.y) < 8) {
-        setDragging({ index: i, type: "anchor" });
-        return;
-      }
-      if (Math.hypot(pos.x - p.cp1.x, pos.y - p.cp1.y) < 8) {
-        setDragging({ index: i, type: "cp1" });
-        return;
-      }
-      if (Math.hypot(pos.x - p.cp2.x, pos.y - p.cp2.y) < 8) {
-        setDragging({ index: i, type: "cp2" });
-        return;
-      }
+const handleMouseDown = (e) => {
+  const pos = getMousePos(e);
+  // Check if clicking near an existing point or control point
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    if (Math.hypot(pos.x - p.x, pos.y - p.y) < 8) {
+      setDragging({ index: i, type: "anchor" });
+      return;
     }
+    if (Math.hypot(pos.x - p.cp1.x, pos.y - p.cp1.y) < 8) {
+      setDragging({ index: i, type: "cp1" });
+      return;
+    }
+    if (Math.hypot(pos.x - p.cp2.x, pos.y - p.cp2.y) < 8) {
+      setDragging({ index: i, type: "cp2" });
+      return;
+    }
+  }
 
-    // Click on curve -> add new point
-    setPoints((prev) => {
-      const lastPoint = prev[prev.length - 1];
-      const newX = pos.x;
-      const newY = pos.y;
-      const newPoint = {
-        x: newX,
-        y: newY,
-        cp1: { x: newX - 50, y: newY - 50 },
-        cp2: { x: newX + 50, y: newY + 50 },
-      };
-      return [...prev, newPoint];
-    });
-  };
+  // Click on curve -> add new point
+  setPoints((prev) => {
+    const newX = pos.x;
+    const newY = pos.y;
+    const newPoint = {
+      x: newX,
+      y: newY,
+      cp1: { x: newX - 50, y: newY - 50 },
+      cp2: { x: newX + 50, y: newY + 50 },
+    };
+    return [...prev, newPoint];
+  });
+};
+
 
   const handleMouseMove = (e) => {
     if (!dragging) return;
