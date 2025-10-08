@@ -230,6 +230,8 @@ useEffect(() => {
     return false;
   };
 
+
+
   const exportSVG = () => {
     if (points.length < 4) return;
     if (checkSelfIntersection(points)) {
@@ -252,6 +254,15 @@ useEffect(() => {
     link.download = "bezier_drawing.svg";
     link.click();
   };
+
+<div style={{ marginTop: 20 }}>
+  <h3>How to Use This App</h3>
+  <div style={{ maxWidth: 600, margin: "0 auto" }}>
+<iframe width="560" height="315" src="https://www.youtube.com/embed/MpOIOfbsSao?si=w4G7JN4rnNT3t44C" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+  </div>
+</div>
+
+
 
   return (
     <div style={{ textAlign: "center" }}>
