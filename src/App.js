@@ -1,37 +1,41 @@
 import React from "react";
 import BezierCanvas from "./BezierCanvas";
-import "./App.css"; // import our CSS file
 
 function App() {
   return (
-    <div className="app-container">
-      <header>
-        <h1>Bezier Curve Drawer</h1>
-        <p>Create and edit Bézier curves, then export them as SVG!</p>
-      </header>
+    <div style={{ padding: 20 }}>
+      <h2 style={{ textAlign: "center" }}>Bezier Curve Drawer</h2>
 
-      <div className="main-content">
-        {/* Video Card */}
-        <div className="card video-card">
-          <h2>How to Use This App</h2>
+      {/* Flex container for canvas + video */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "flex-start",
+          gap: "20px", // space between canvas and video
+          flexWrap: "wrap", // allows stacking on smaller screens
+        }}
+      >
+        {/* Video section */}
+        <div style={{ flex: "0 0 560px" }}>
+          <h3 style={{ textAlign: "center" }}>How to Use This App</h3>
           <iframe
+            width="100%"
+            height="315"
             src="https://www.youtube.com/embed/MpOIOfbsSao?si=CZrekRUTKNT578QM"
             title="YouTube video player"
             frameBorder="0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerPolicy="strict-origin-when-cross-origin"
             allowFullScreen
           ></iframe>
         </div>
 
-        {/* Canvas Card */}
-        <div className="card canvas-card">
+        {/* Canvas section */}
+        <div>
           <BezierCanvas />
         </div>
       </div>
-
-      <footer>
-        <p>Made with ❤️ using React</p>
-      </footer>
     </div>
   );
 }
