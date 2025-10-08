@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
+/* eslint-disable no-unused-vars */
+/* eslint-disable react-hooks/exhaustive-deps */
 
 const PIXELS_PER_INCH = 96;
 const SAMPLE_POINTS = 100;
@@ -16,25 +18,26 @@ const BezierCanvas = () => {
   const topLine = 0;
   const bottomLine = canvasHeight;
 
-  const createInitialCurve = () => {
-    const start = { x: canvasWidth / 2, y: topLine, isEnd: true, lockY: true };
-    const end = { x: canvasWidth / 2, y: bottomLine, isEnd: true, lockY: true };
-    const dx = end.x - start.x;
-    const dy = end.y - start.y;
-    const dist = Math.hypot(dx, dy) || 1;
-    const nx = dx / dist;
-    const ny = dy / dist;
-    const c1 = {
-      x: start.x + nx * 50 - ny * 30,
-      y: start.y + ny * 50 + nx * 30,
-    };
-    const c2 = { x: end.x - nx * 50 + ny * 30, y: end.y - ny * 50 - nx * 30 };
-    return [start, c1, c2, end];
+  const createInitialCurve = React.useCallback(() => {
+  const start = { x: canvasWidth / 2, y: topLine, isEnd: true, lockY: true };
+  const end = { x: canvasWidth / 2, y: bottomLine, isEnd: true, lockY: true };
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  const nx = dx / dist;
+  const ny = dy / dist;
+  const c1 = {
+    x: start.x + nx * 50 - ny * 30,
+    y: start.y + ny * 50 + nx * 30,
   };
+  const c2 = { x: end.x - nx * 50 + ny * 30, y: end.y - ny * 50 - nx * 30 };
+  return [start, c1, c2, end];
+}, [canvasWidth, bottomLine, topLine]);
 
-  useEffect(() => {
-    setPoints(createInitialCurve());
-  }, [canvasHeightInches, canvasWidthInches]);
+useEffect(() => {
+  setPoints(createInitialCurve());
+}, [createInitialCurve]);
+
 
   const bezierPoint = (t, p0, p1, p2, p3) => {
     const u = 1 - t;
