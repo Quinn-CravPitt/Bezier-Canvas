@@ -1,262 +1,297 @@
-// src/BezierCanvas.js
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect } from "react";
 
 const PIXELS_PER_INCH = 96;
+const SAMPLE_POINTS = 100;
+const CLICK_THRESHOLD = 10;
 
 const BezierCanvas = () => {
-  const canvasRef = useRef(null);
-
-  const [canvasWidthInches, setCanvasWidthInches] = useState(3);
   const [canvasHeightInches, setCanvasHeightInches] = useState(8);
+  const [canvasWidthInches, setCanvasWidthInches] = useState(3);
+  const [points, setPoints] = useState([]);
+  const [draggingPointIndex, setDraggingPointIndex] = useState(null);
+  const canvasRef = useRef(null);
 
   const canvasWidth = canvasWidthInches * PIXELS_PER_INCH;
   const canvasHeight = canvasHeightInches * PIXELS_PER_INCH;
-
   const topLine = 0;
-  const bottomLine = canvasHeight - 0;
+  const bottomLine = canvasHeight;
 
-  const [points, setPoints] = useState([]);
-  const [dragging, setDragging] = useState(null);
-
-  // Initial Bezier curve
-  const createInitialCurve = useCallback(() => {
-    const midX = canvasWidth / 2;
-    return [
-      {
-        x: midX,
-        y: topLine + canvasHeight * 0.1, // slightly below top
-        cp1: { x: midX - 50, y: topLine + canvasHeight * 0.25 },
-        cp2: { x: midX + 50, y: bottomLine - canvasHeight * 0.25 },
-      },
-      {
-        x: midX,
-        y: bottomLine - canvasHeight * 0.1, // slightly above bottom
-        cp1: { x: midX - 50, y: bottomLine - canvasHeight * 0.25 },
-        cp2: { x: midX + 50, y: bottomLine - canvasHeight * 0.1 },
-      },
-    ];
-  }, [canvasWidth, canvasHeight, topLine, bottomLine]);
+  const createInitialCurve = () => {
+    const start = { x: canvasWidth / 2, y: topLine, isEnd: true, lockY: true };
+    const end = { x: canvasWidth / 2, y: bottomLine, isEnd: true, lockY: true };
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const nx = dx / dist;
+    const ny = dy / dist;
+    const c1 = {
+      x: start.x + nx * 50 - ny * 30,
+      y: start.y + ny * 50 + nx * 30,
+    };
+    const c2 = { x: end.x - nx * 50 + ny * 30, y: end.y - ny * 50 - nx * 30 };
+    return [start, c1, c2, end];
+  };
 
   useEffect(() => {
     setPoints(createInitialCurve());
-  }, [createInitialCurve]);
+  }, [canvasHeightInches, canvasWidthInches]);
 
-  // Draw the canvas
+  const bezierPoint = (t, p0, p1, p2, p3) => {
+    const u = 1 - t;
+    const x =
+      u ** 3 * p0.x +
+      3 * u ** 2 * t * p1.x +
+      3 * u * t ** 2 * p2.x +
+      t ** 3 * p3.x;
+    const y =
+      u ** 3 * p0.y +
+      3 * u ** 2 * t * p1.y +
+      3 * u * t ** 2 * p2.y +
+      t ** 3 * p3.y;
+    return { x, y };
+  };
+
+  // Draw canvas
   useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvasRef.current.getContext("2d");
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-    // Draw top and bottom dashed lines
-    ctx.strokeStyle = "#888";
+    // Horizontal dashed lines
     ctx.setLineDash([5, 5]);
+    ctx.strokeStyle = "#999";
     ctx.beginPath();
     ctx.moveTo(0, topLine);
     ctx.lineTo(canvasWidth, topLine);
-    ctx.stroke();
-
-    ctx.beginPath();
     ctx.moveTo(0, bottomLine);
     ctx.lineTo(canvasWidth, bottomLine);
     ctx.stroke();
+
+    // Display width above top dashed line
+    ctx.setLineDash([]);
+    ctx.font = "16px Arial";
+    ctx.fillStyle = "black";
+    ctx.fillText(
+      `${canvasWidthInches.toFixed(2)} in`,
+      canvasWidth - 50,
+      topLine + 15
+    );
+
+    // Vertical dashed line (height indicator)
+    const heightLineX = canvasWidth / 2;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(heightLineX, topLine);
+    ctx.lineTo(heightLineX, bottomLine);
+    ctx.stroke();
     ctx.setLineDash([]);
 
-    // Draw Bezier curves and control lines
-    for (let i = 0; i < points.length - 1; i++) {
-      const p0 = points[i];
-      const p1 = points[i + 1];
+    // Display height
+    const heightInches = ((bottomLine - topLine) / PIXELS_PER_INCH).toFixed(2);
+    ctx.fillText(
+      `${heightInches} in`,
+      heightLineX + 5,
+      (topLine + bottomLine) / 2
+    );
 
-      // Control lines
-      ctx.strokeStyle = "#aaa";
+    // Draw Bézier curve
+    if (points.length >= 4) {
       ctx.beginPath();
-      ctx.moveTo(p0.x, p0.y);
-      ctx.lineTo(p0.cp1.x, p0.cp1.y);
-      ctx.moveTo(p1.x, p1.y);
-      ctx.lineTo(p1.cp2.x, p1.cp2.y);
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 0; i < points.length - 3; i += 3) {
+        const [p0, p1, p2, p3] = points.slice(i, i + 4);
+        ctx.bezierCurveTo(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
+      }
+      ctx.strokeStyle = "blue";
+      ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Bezier curve
-      ctx.strokeStyle = "#000";
-      ctx.beginPath();
-      ctx.moveTo(p0.x, p0.y);
-      ctx.bezierCurveTo(
-        p0.cp2.x,
-        p0.cp2.y,
-        p1.cp1.x,
-        p1.cp1.y,
-        p1.x,
-        p1.y
-      );
-      ctx.stroke();
+      // Draw control lines
+      for (let i = 0; i < points.length - 3; i += 3) {
+        const [p0, p1, p2, p3] = points.slice(i, i + 4);
+        ctx.beginPath();
+        ctx.moveTo(p0.x, p0.y);
+        ctx.lineTo(p1.x, p1.y);
+        ctx.moveTo(p2.x, p2.y);
+        ctx.lineTo(p3.x, p3.y);
+        ctx.strokeStyle = "gray";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
     }
 
-    // Draw points and control points
+    // Draw points
     points.forEach((p) => {
-      ctx.fillStyle = "blue";
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = "red";
-      ctx.beginPath();
-      ctx.arc(p.cp1.x, p.cp1.y, 4, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.arc(p.cp2.x, p.cp2.y, 4, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
+      ctx.fillStyle = p.isEnd ? "red" : "black";
       ctx.fill();
     });
-  }, [points, canvasWidth, canvasHeight, topLine, bottomLine]);
+  }, [points, canvasHeight, canvasWidth]);
 
-  const getMousePos = (e) => {
+  const handleMouseDown = (e) => {
     const rect = canvasRef.current.getBoundingClientRect();
-    return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    };
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    for (let i = 0; i < points.length; i++) {
+      if (Math.hypot(points[i].x - x, points[i].y - y) < 10) {
+        setDraggingPointIndex(i);
+        return;
+      }
+    }
+
+    for (let i = 0; i < points.length - 3; i += 3) {
+      const [p0, p1, p2, p3] = points.slice(i, i + 4);
+      for (let t = 0; t <= 1; t += 1 / SAMPLE_POINTS) {
+        const pt = bezierPoint(t, p0, p1, p2, p3);
+        if (Math.hypot(pt.x - x, pt.y - y) <= CLICK_THRESHOLD) {
+          const newPoint = { x, y, isEnd: false };
+          const dx = p3.x - p0.x;
+          const dy = p3.y - p0.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          const nx = dx / dist;
+          const ny = dy / dist;
+          const c1 = {
+            x: newPoint.x - nx * 20 - ny * 10,
+            y: newPoint.y - ny * 20 + nx * 10,
+          };
+          const c2 = {
+            x: newPoint.x + nx * 20 + ny * 10,
+            y: newPoint.y + ny * 20 - nx * 10,
+          };
+          const newPoints = [
+            ...points.slice(0, i + 1),
+            c1,
+            newPoint,
+            c2,
+            ...points.slice(i + 1),
+          ];
+          setPoints(newPoints);
+          return;
+        }
+      }
+    }
   };
-
-const handleMouseDown = (e) => {
-  const pos = getMousePos(e);
-  // Check if clicking near an existing point or control point
-  for (let i = 0; i < points.length; i++) {
-    const p = points[i];
-    if (Math.hypot(pos.x - p.x, pos.y - p.y) < 8) {
-      setDragging({ index: i, type: "anchor" });
-      return;
-    }
-    if (Math.hypot(pos.x - p.cp1.x, pos.y - p.cp1.y) < 8) {
-      setDragging({ index: i, type: "cp1" });
-      return;
-    }
-    if (Math.hypot(pos.x - p.cp2.x, pos.y - p.cp2.y) < 8) {
-      setDragging({ index: i, type: "cp2" });
-      return;
-    }
-  }
-
-  // Click on curve -> add new point
-  setPoints((prev) => {
-    const newX = pos.x;
-    const newY = pos.y;
-    const newPoint = {
-      x: newX,
-      y: newY,
-      cp1: { x: newX - 50, y: newY - 50 },
-      cp2: { x: newX + 50, y: newY + 50 },
-    };
-    return [...prev, newPoint];
-  });
-};
-
 
   const handleMouseMove = (e) => {
-    if (!dragging) return;
-    const pos = getMousePos(e);
+    if (draggingPointIndex === null) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
     setPoints((prev) => {
-      const newPoints = [...prev];
-      const p = newPoints[dragging.index];
-      if (dragging.type === "anchor") {
-        p.x = pos.x;
-        p.y = pos.y;
-      }
-      if (dragging.type === "cp1") {
-        p.cp1.x = pos.x;
-        p.cp1.y = pos.y;
-      }
-      if (dragging.type === "cp2") {
-        p.cp2.x = pos.x;
-        p.cp2.y = pos.y;
-      }
-      return newPoints;
+      const updated = [...prev];
+      const point = updated[draggingPointIndex];
+      updated[draggingPointIndex] = point.lockY
+        ? { ...point, x }
+        : { ...point, x, y };
+      return updated;
     });
   };
 
-  const handleMouseUp = () => {
-    setDragging(null);
+  const handleMouseUp = () => setDraggingPointIndex(null);
+  const handleReset = () => setPoints(createInitialCurve());
+
+  const segmentsIntersect = (p1, p2, q1, q2) => {
+    const cross = (a, b) => a.x * b.y - a.y * b.x;
+    const subtract = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
+    const r = subtract(p2, p1);
+    const s = subtract(q2, q1);
+    const denom = cross(r, s);
+    if (denom === 0) return false;
+    const u = cross(subtract(q1, p1), r) / denom;
+    const t = cross(subtract(q1, p1), s) / denom;
+    return t >= 0 && t <= 1 && u >= 0 && u <= 1;
   };
 
-  const resetCanvas = () => {
-    setPoints(createInitialCurve());
+  const checkSelfIntersection = (points) => {
+    const sampled = [];
+    for (let i = 0; i < points.length - 3; i += 3) {
+      const [p0, p1, p2, p3] = points.slice(i, i + 4);
+      for (let t = 0; t <= 1; t += 1 / SAMPLE_POINTS) {
+        sampled.push(bezierPoint(t, p0, p1, p2, p3));
+      }
+    }
+    for (let i = 0; i < sampled.length - 1; i++) {
+      for (let j = i + 2; j < sampled.length - 1; j++) {
+        if (
+          segmentsIntersect(
+            sampled[i],
+            sampled[i + 1],
+            sampled[j],
+            sampled[j + 1]
+          )
+        )
+          return true;
+      }
+    }
+    return false;
   };
 
   const exportSVG = () => {
-    if (points.length < 2) return;
-
-    const svgParts = [];
-    svgParts.push(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasWidth}" height="${canvasHeight}">`
-    );
-
-    for (let i = 0; i < points.length - 1; i++) {
-      const p0 = points[i];
-      const p1 = points[i + 1];
-
-      // Skip if points are outside top/bottom lines
-      if (
-        p0.y < topLine ||
-        p0.y > bottomLine ||
-        p1.y < topLine ||
-        p1.y > bottomLine
-      )
-        continue;
-
-      svgParts.push(
-        `<path d="M ${p0.x},${p0.y} C ${p0.cp2.x},${p0.cp2.y} ${p1.cp1.x},${p1.cp1.y} ${p1.x},${p1.y}" stroke="black" fill="transparent"/>`
-      );
+    if (points.length < 4) return;
+    if (checkSelfIntersection(points)) {
+      alert("Cannot export: the Bézier curve overlaps itself!");
+      return;
     }
-
-    svgParts.push("</svg>");
-    const blob = new Blob([svgParts.join("\n")], { type: "image/svg+xml" });
+    let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasWidth}" height="${canvasHeight}">\n`;
+    for (let i = 0; i < points.length - 3; i += 3) {
+      const [p0, p1, p2, p3] = points.slice(i, i + 4);
+      const clipped = [p0, p1, p2, p3].map((p) => ({
+        x: p.x,
+        y: Math.min(Math.max(p.y, topLine), bottomLine),
+      }));
+      svg += `<path d="M ${clipped[0].x} ${clipped[0].y} C ${clipped[1].x} ${clipped[1].y}, ${clipped[2].x} ${clipped[2].y}, ${clipped[3].x} ${clipped[3].y}" stroke="blue" fill="none" stroke-width="2"/>\n`;
+    }
+    svg += "</svg>";
+    const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = "bezier.svg";
+    link.download = "bezier_drawing.svg";
     link.click();
   };
 
   return (
-    <div>
-      <div style={{ marginBottom: "10px" }}>
-        <label>
-          Width (inches):
-          <input
-            type="number"
-            min="1"
-            max="8"
-            step="0.1"
-            value={canvasWidthInches}
-            onChange={(e) => setCanvasWidthInches(parseFloat(e.target.value))}
-          />
-        </label>
-        <label style={{ marginLeft: "10px" }}>
-          Height (inches):
-          <input
-            type="number"
-            min="1"
-            max="8"
-            step="0.1"
-            value={canvasHeightInches}
-            onChange={(e) =>
-              setCanvasHeightInches(parseFloat(e.target.value))
-            }
-          />
-        </label>
-        <button style={{ marginLeft: "10px" }} onClick={resetCanvas}>
-          Reset
-        </button>
-        <button style={{ marginLeft: "10px" }} onClick={exportSVG}>
-          Export SVG
-        </button>
+    <div style={{ textAlign: "center" }}>
+      <h2>Bezier Curve Drawer</h2>
+      <div>
+        <label>Height (inches): </label>
+        <input
+          type="range"
+          min="1"
+          max="8"
+          step="0.1"
+          value={canvasHeightInches}
+          onChange={(e) => setCanvasHeightInches(parseFloat(e.target.value))}
+        />
+        <span>{canvasHeightInches.toFixed(1)} in</span>
+      </div>
+      <div>
+        <label>Width (inches): </label>
+        <input
+          type="range"
+          min="1"
+          max="8"
+          step="0.1"
+          value={canvasWidthInches}
+          onChange={(e) => setCanvasWidthInches(parseFloat(e.target.value))}
+        />
+        <span>{canvasWidthInches.toFixed(1)} in</span>
       </div>
       <canvas
         ref={canvasRef}
         width={canvasWidth}
         height={canvasHeight}
-        style={{ border: "1px solid black" }}
+        style={{ border: "1px solid black", marginTop: 10, background: "#fff" }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
       />
+      <div style={{ marginTop: 10 }}>
+        <button onClick={handleReset}>Reset Curve</button>
+        <button onClick={exportSVG} style={{ marginLeft: 10 }}>
+          Export SVG
+        </button>
+      </div>
     </div>
   );
 };
