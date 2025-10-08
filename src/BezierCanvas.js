@@ -33,8 +33,8 @@ const BezierCanvas = () => {
   };
 
   useEffect(() => {
-    setPoints(createInitialCurve());
-  }, [canvasHeightInches, canvasWidthInches]);
+  setPoints(createInitialCurve());
+}, [canvasHeightInches, canvasWidthInches, createInitialCurve]);
 
   const bezierPoint = (t, p0, p1, p2, p3) => {
     const u = 1 - t;
