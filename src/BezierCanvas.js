@@ -391,7 +391,7 @@ export default function BezierCanvas() {
         fontFamily: "Arial, sans-serif",
       }}
     >
-      <h2>Design Your Own!</h2>
+      <h2>Bezier Curve Drawer</h2>
 
       <div style={{ marginBottom: 10 }}>
         <label>Height (in): </label>
