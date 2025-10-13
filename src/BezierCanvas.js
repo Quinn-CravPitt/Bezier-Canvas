@@ -391,7 +391,7 @@ export default function BezierCanvas() {
         fontFamily: "Arial, sans-serif",
       }}
     >
-      <h2>Bezier Curve Drawer</h2>
+      <h2>Design Your Own!</h2>
 
       <div style={{ marginBottom: 10 }}>
         <label>Height (in): </label>
@@ -417,7 +417,7 @@ export default function BezierCanvas() {
         <input
           type="range"
           min="1"
-          max="8"
+          max="7"
           step="0.1"
           value={canvasWidthInches}
           onChange={(e) => {
