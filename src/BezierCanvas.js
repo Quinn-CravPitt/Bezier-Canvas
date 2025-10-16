@@ -21,6 +21,7 @@ export default function BezierCanvas() {
   const topLine = 0;
   const bottomLine = canvasHeight;
 
+  // Initialize straight vertical anchors
   const createInitialAnchors = useCallback(() => {
     const midX = canvasWidth / 2;
     const start = {
@@ -45,6 +46,7 @@ export default function BezierCanvas() {
     setPrevCanvasSize({ width: canvasWidth, height: canvasHeight });
   }, [createInitialAnchors]);
 
+  // Scale anchors when canvas is resized
   const scaleAnchors = (newWidth, newHeight) => {
     const scaleX = newWidth / prevCanvasSize.width;
     const scaleY = newHeight / prevCanvasSize.height;
@@ -60,6 +62,7 @@ export default function BezierCanvas() {
     setPrevCanvasSize({ width: newWidth, height: newHeight });
   };
 
+  // Cubic Bézier evaluation
   const bezierPoint = (t, A, B) => {
     const u = 1 - t;
     return {
@@ -84,7 +87,7 @@ export default function BezierCanvas() {
     return samples;
   }, []);
 
-  // Drawing loop (same as before)
+  // Draw loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -139,21 +142,14 @@ export default function BezierCanvas() {
       canvasHeight / 2
     );
 
-    // Curve & handles
+    // Draw curve & handles
     if (anchors.length >= 2) {
       ctx.beginPath();
       ctx.moveTo(anchors[0].x, anchors[0].y);
       for (let i = 0; i < anchors.length - 1; i++) {
         const A = anchors[i],
           B = anchors[i + 1];
-        ctx.bezierCurveTo(
-          A.cp2.x,
-          A.cp2.y,
-          B.cp1.x,
-          B.cp1.y,
-          B.x,
-          B.y
-        );
+        ctx.bezierCurveTo(A.cp2.x, A.cp2.y, B.cp1.x, B.cp1.y, B.x, B.y);
       }
       ctx.strokeStyle = "blue";
       ctx.lineWidth = 2;
@@ -203,6 +199,7 @@ export default function BezierCanvas() {
     bottomLine,
   ]);
 
+  // Hit test for curve
   function hitTestCurve(x, y, threshold = 8) {
     if (anchors.length < 2) return null;
     let best = { segIndex: -1, dist: Infinity };
@@ -216,13 +213,16 @@ export default function BezierCanvas() {
     return best.dist <= threshold ? best : null;
   }
 
+  // Mouse events
   const handleMouseDown = (e) => {
     const rect = canvasRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
+    // Delete mode
     if (tool === "delete") {
       for (let i = 1; i < anchors.length - 1; i++) {
+        // cannot delete first or last
         const a = anchors[i];
         if (Math.hypot(a.x - x, a.y - y) < 10) {
           setAnchors((prev) => {
@@ -236,6 +236,7 @@ export default function BezierCanvas() {
       return;
     }
 
+    // Check for dragging
     for (let i = 0; i < anchors.length; i++) {
       const a = anchors[i];
       if (Math.hypot(a.x - x, a.y - y) < 8) {
@@ -252,15 +253,11 @@ export default function BezierCanvas() {
       }
     }
 
+    // Add point
     const hit = hitTestCurve(x, y, 10);
     if (hit) {
       const insertAt = hit.segIndex + 1;
-      const newAnchor = {
-        x,
-        y,
-        cp1: { x: x - 40, y },
-        cp2: { x: x + 40, y },
-      };
+      const newAnchor = { x, y, cp1: { x: x - 40, y }, cp2: { x: x + 40, y } };
       const nextAnchors = [...anchors];
       nextAnchors.splice(insertAt, 0, newAnchor);
       setAnchors(nextAnchors);
@@ -299,6 +296,7 @@ export default function BezierCanvas() {
   const handleMouseUp = () => setDragging(null);
   const handleReset = () => setAnchors(createInitialAnchors());
 
+  // Check for self-intersections
   function segmentsIntersect(p1, p2, q1, q2) {
     const det = (p2.x - p1.x) * (q2.y - q1.y) - (p2.y - p1.y) * (q2.x - q1.x);
     if (det === 0) return false;
@@ -337,25 +335,44 @@ export default function BezierCanvas() {
     }
     if (anchors.length < 2) return;
 
+    // Sample all points to find the true leftmost x of the curve
     const allPoints = [];
     for (let i = 0; i < anchors.length - 1; i++) {
       allPoints.push(...bezierSamples(anchors[i], anchors[i + 1]));
     }
     const minX = Math.min(...allPoints.map((p) => p.x));
-    const offset = PIXELS_PER_INCH;
-    const deltaX = offset - minX;
 
+    // Shift all curve points right by 1 inch from the leftmost curve point
+    const offset = PIXELS_PER_INCH;
+    const deltaX = offset - minX; // how much to shift right
+
+    // Start building SVG path
     let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasWidth}" height="${canvasHeight}">\n`;
     svg += `<path d="`;
+
+    // Vertical line at 1 inch left of the curve
     svg += `M ${0} ${canvasHeight} L ${0} 0 `;
+
+    // Connect to top of curve (shifted)
     svg += `L ${anchors[0].x + deltaX} ${anchors[0].y} `;
+
+    // Bézier curve itself (all points shifted)
     for (let i = 0; i < anchors.length - 1; i++) {
       const A = anchors[i],
         B = anchors[i + 1];
-      svg += `C ${A.cp2.x + deltaX} ${A.cp2.y}, ${B.cp1.x + deltaX} ${B.cp1.y}, ${B.x + deltaX} ${B.y} `;
+      svg += `C ${A.cp2.x + deltaX} ${A.cp2.y}, ${B.cp1.x + deltaX} ${
+        B.cp1.y
+      }, ${B.x + deltaX} ${B.y} `;
     }
-    svg += `L ${anchors[anchors.length - 1].x + deltaX} ${anchors[anchors.length - 1].y} `;
+
+    // Connect to bottom of curve
+    svg += `L ${anchors[anchors.length - 1].x + deltaX} ${
+      anchors[anchors.length - 1].y
+    } `;
+
+    // Close polygon back to bottom-left
     svg += `L 0 ${canvasHeight} Z" `;
+
     svg += `stroke="blue" fill="none" stroke-width="2"/>\n</svg>`;
 
     const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
@@ -366,14 +383,11 @@ export default function BezierCanvas() {
     URL.revokeObjectURL(link.href);
   };
 
+  // --- New Function ---
   const shareSVG = async () => {
-    if (curveSelfIntersects(anchors)) {
-      alert("Cannot share: Curve intersects itself!");
-      return;
-    }
     if (anchors.length < 2) return;
 
-    // Generate the same SVG string
+    // Generate the same SVG string as exportSVG
     const allPoints = [];
     for (let i = 0; i < anchors.length - 1; i++) {
       allPoints.push(...bezierSamples(anchors[i], anchors[i + 1]));
@@ -383,48 +397,159 @@ export default function BezierCanvas() {
     const deltaX = offset - minX;
 
     let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasWidth}" height="${canvasHeight}">\n`;
-    svg += `<path d="`;
-    svg += `M ${0} ${canvasHeight} L ${0} 0 `;
-    svg += `L ${anchors[0].x + deltaX} ${anchors[0].y} `;
+    svg += `<path d="M 0 ${canvasHeight} L 0 0 L ${anchors[0].x + deltaX} ${
+      anchors[0].y
+    } `;
     for (let i = 0; i < anchors.length - 1; i++) {
       const A = anchors[i],
         B = anchors[i + 1];
-      svg += `C ${A.cp2.x + deltaX} ${A.cp2.y}, ${B.cp1.x + deltaX} ${B.cp1.y}, ${B.x + deltaX} ${B.y} `;
+      svg += `C ${A.cp2.x + deltaX} ${A.cp2.y}, ${B.cp1.x + deltaX} ${
+        B.cp1.y
+      }, ${B.x + deltaX} ${B.y} `;
     }
-    svg += `L ${anchors[anchors.length - 1].x + deltaX} ${anchors[anchors.length - 1].y} `;
-    svg += `L 0 ${canvasHeight} Z" `;
-    svg += `stroke="blue" fill="none" stroke-width="2"/>\n</svg>`;
+    svg += `L ${anchors[anchors.length - 1].x + deltaX} ${
+      anchors[anchors.length - 1].y
+    } L 0 ${canvasHeight} Z" stroke="blue" fill="none" stroke-width="2"/>\n</svg>`;
 
     try {
-      const res = await fetch("/.netlify/functions/share-svg", {
+      const response = await fetch("/.netlify/functions/save-svg", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ svg }),
       });
-      const { id } = await res.json();
-      // Open in new tab
-      const shareUrl = `${window.location.origin}/share/${id}`;
-      window.open(shareUrl, "_blank");
+      const data = await response.json();
+
+      if (data.url) {
+        window.open(data.url, "_blank"); // open the share link in new tab
+      } else {
+        alert("Failed to generate share link.");
+      }
     } catch (err) {
-      console.error("Error sharing SVG:", err);
-      alert("Error generating share link");
+      console.error(err);
+      alert("Error sharing SVG");
     }
   };
 
   return (
-    <div style={{ textAlign: "center", padding: 24, fontFamily: "Arial, sans-serif" }}>
+    <div
+      style={{
+        textAlign: "center",
+        padding: 24,
+        fontFamily: "Arial, sans-serif",
+      }}
+    >
       <h2>Bezier Curve Drawer</h2>
-      {/* sliders, canvas UI same as before */}
+
+      <div style={{ marginBottom: 10 }}>
+        <label>Height (in): </label>
+        <input
+          type="range"
+          min="1"
+          max="8"
+          step="0.1"
+          value={canvasHeightInches}
+          onChange={(e) => {
+            const h = parseFloat(e.target.value);
+            setCanvasHeightInches(h);
+            scaleAnchors(canvasWidth, h * PIXELS_PER_INCH);
+          }}
+        />
+        <span style={{ marginLeft: 8 }}>
+          {canvasHeightInches.toFixed(1)} in
+        </span>
+      </div>
+
+      <div style={{ marginBottom: 10 }}>
+        <label>Width (in): </label>
+        <input
+          type="range"
+          min="1"
+          max="7"
+          step="0.1"
+          value={canvasWidthInches}
+          onChange={(e) => {
+            const w = parseFloat(e.target.value);
+            setCanvasWidthInches(w);
+            scaleAnchors(w * PIXELS_PER_INCH, canvasHeight);
+          }}
+        />
+        <span style={{ marginLeft: 8 }}>{canvasWidthInches.toFixed(1)} in</span>
+      </div>
+
+      <canvas
+        ref={canvasRef}
+        style={{
+          border: "1px solid #ccc",
+          background: "#fff",
+          borderRadius: 10,
+          boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
+          cursor: dragging ? "grabbing" : "crosshair",
+        }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+      />
+
       <div style={{ marginTop: 12 }}>
-        <button onClick={handleReset} style={buttonStyle("#007bff")}>Reset Curve</button>
-        <button onClick={exportSVG} style={{ ...buttonStyle("#28a745"), marginLeft: 10 }}>Export SVG</button>
-        <button onClick={shareSVG} style={{ ...buttonStyle("#17a2b8"), marginLeft: 10 }}>Share</button>
-        <button onClick={() => setTool(tool === "delete" ? "add" : "delete")}
-          style={{ ...buttonStyle(tool === "delete" ? "#d32f2f" : "#666"), marginLeft: 10 }}>
+        <button onClick={handleReset} style={buttonStyle("#007bff")}>
+          Reset Curve
+        </button>
+        <button
+          onClick={exportSVG}
+          style={{ ...buttonStyle("#28a745"), marginLeft: 10 }}
+        >
+          Export SVG
+        </button>
+        <button
+          onClick={() => setTool(tool === "delete" ? "add" : "delete")}
+          style={{
+            ...buttonStyle(tool === "delete" ? "#d32f2f" : "#666"),
+            marginLeft: 10,
+          }}
+        >
           {tool === "delete" ? "Exit Delete" : "Delete Point"}
         </button>
+        <button
+  onClick={shareSVG}
+  style={{ ...buttonStyle("#6f42c1"), marginLeft: 10 }}
+>
+  Share SVG
+</button>
+
       </div>
-      {/* rest of UI unchanged (active tool text, video embed, etc.) */}
+
+      <div style={{ marginTop: 12, fontWeight: "bold" }}>
+        Active Tool: {tool === "delete" ? "Delete" : "Add / Edit"}
+      </div>
+
+      <div
+        style={{
+          marginTop: 36,
+          maxWidth: 700,
+          marginLeft: "auto",
+          marginRight: "auto",
+        }}
+      >
+        <h3>How to Use This App</h3>
+        <div
+          style={{
+            borderRadius: 10,
+            overflow: "hidden",
+            boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
+          }}
+        >
+          <iframe
+            width="100%"
+            height="360"
+            src="https://www.youtube.com/embed/MpOIOfbsSao?si=w4G7JN4rnNT3t44C"
+            title="YouTube video"
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerPolicy="strict-origin-when-cross-origin"
+            allowFullScreen
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -437,4 +562,3 @@ const buttonStyle = (bg) => ({
   border: "none",
   cursor: "pointer",
 });
-
