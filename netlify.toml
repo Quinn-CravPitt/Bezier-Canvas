@@ -1,0 +1,4 @@
+[[redirects]]
+  from = "/view/*"
+  to = "/.netlify/functions/view-svg"
+  status = 200
