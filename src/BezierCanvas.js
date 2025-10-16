@@ -383,52 +383,30 @@ export default function BezierCanvas() {
     URL.revokeObjectURL(link.href);
   };
 
-  // --- New Function ---
-  const shareSVG = async () => {
-    if (anchors.length < 2) return;
+const shareSVG = () => {
+  if (anchors.length < 2) return;
 
-    // Generate the same SVG string as exportSVG
-    const allPoints = [];
-    for (let i = 0; i < anchors.length - 1; i++) {
-      allPoints.push(...bezierSamples(anchors[i], anchors[i + 1]));
-    }
-    const minX = Math.min(...allPoints.map((p) => p.x));
-    const offset = PIXELS_PER_INCH;
-    const deltaX = offset - minX;
+  const allPoints = [];
+  for (let i = 0; i < anchors.length - 1; i++) {
+    allPoints.push(...bezierSamples(anchors[i], anchors[i + 1]));
+  }
+  const minX = Math.min(...allPoints.map((p) => p.x));
+  const offset = PIXELS_PER_INCH;
+  const deltaX = offset - minX;
 
-    let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasWidth}" height="${canvasHeight}">\n`;
-    svg += `<path d="M 0 ${canvasHeight} L 0 0 L ${anchors[0].x + deltaX} ${
-      anchors[0].y
-    } `;
-    for (let i = 0; i < anchors.length - 1; i++) {
-      const A = anchors[i],
-        B = anchors[i + 1];
-      svg += `C ${A.cp2.x + deltaX} ${A.cp2.y}, ${B.cp1.x + deltaX} ${
-        B.cp1.y
-      }, ${B.x + deltaX} ${B.y} `;
-    }
-    svg += `L ${anchors[anchors.length - 1].x + deltaX} ${
-      anchors[anchors.length - 1].y
-    } L 0 ${canvasHeight} Z" stroke="blue" fill="none" stroke-width="2"/>\n</svg>`;
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasWidth}" height="${canvasHeight}">\n`;
+  svg += `<path d="M 0 ${canvasHeight} L 0 0 L ${anchors[0].x + deltaX} ${anchors[0].y} `;
+  for (let i = 0; i < anchors.length - 1; i++) {
+    const A = anchors[i], B = anchors[i + 1];
+    svg += `C ${A.cp2.x + deltaX} ${A.cp2.y}, ${B.cp1.x + deltaX} ${B.cp1.y}, ${B.x + deltaX} ${B.y} `;
+  }
+  svg += `L ${anchors[anchors.length - 1].x + deltaX} ${anchors[anchors.length - 1].y} L 0 ${canvasHeight} Z" stroke="blue" fill="none" stroke-width="2"/>\n</svg>`;
 
-    try {
-      const response = await fetch("/.netlify/functions/save-svg", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ svg }),
-      });
-      const data = await response.json();
+  const base64 = btoa(unescape(encodeURIComponent(svg)));
+  const url = `/view?data=${base64}`;
+  window.open(url, "_blank");
+};
 
-      if (data.url) {
-        window.open(data.url, "_blank"); // open the share link in new tab
-      } else {
-        alert("Failed to generate share link.");
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Error sharing SVG");
-    }
-  };
 
   return (
     <div
