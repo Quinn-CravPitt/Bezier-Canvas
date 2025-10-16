@@ -1,10 +1,12 @@
-export const handler = async (event) => {
-  const base64 = event.queryStringParameters?.data;
-  if (!base64) {
-    return { statusCode: 400, body: "No SVG data provided" };
-  }
+const { svgs } = require("./share-svg");
 
-  const svg = decodeURIComponent(escape(atob(base64)));
+exports.handler = async (event) => {
+  const id = event.path.replace("/view/", "");
+
+  const svg = svgs[id];
+  if (!svg) {
+    return { statusCode: 404, body: "SVG not found" };
+  }
 
   return {
     statusCode: 200,

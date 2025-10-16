@@ -383,29 +383,53 @@ export default function BezierCanvas() {
     URL.revokeObjectURL(link.href);
   };
 
-const shareSVG = () => {
+const shareSVG = async () => {
+  if (curveSelfIntersects(anchors)) {
+    alert("Cannot share: Curve intersects itself!");
+    return;
+  }
   if (anchors.length < 2) return;
 
+  // Sample all points to find the true leftmost x of the curve
   const allPoints = [];
   for (let i = 0; i < anchors.length - 1; i++) {
     allPoints.push(...bezierSamples(anchors[i], anchors[i + 1]));
   }
   const minX = Math.min(...allPoints.map((p) => p.x));
-  const offset = PIXELS_PER_INCH;
-  const deltaX = offset - minX;
 
-  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasWidth}" height="${canvasHeight}">\n`;
-  svg += `<path d="M 0 ${canvasHeight} L 0 0 L ${anchors[0].x + deltaX} ${anchors[0].y} `;
+  // Shift all curve points right by 1 inch from the leftmost curve point
+  const offset = PIXELS_PER_INCH;
+  const deltaX = offset - minX; // how much to shift right
+
+  // Build SVG string
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasWidth}" height="${canvasHeight}">`;
+  svg += `<path d="M0 ${canvasHeight} L0 0 L${anchors[0].x + deltaX} ${anchors[0].y} `;
   for (let i = 0; i < anchors.length - 1; i++) {
-    const A = anchors[i], B = anchors[i + 1];
+    const A = anchors[i],
+      B = anchors[i + 1];
     svg += `C ${A.cp2.x + deltaX} ${A.cp2.y}, ${B.cp1.x + deltaX} ${B.cp1.y}, ${B.x + deltaX} ${B.y} `;
   }
-  svg += `L ${anchors[anchors.length - 1].x + deltaX} ${anchors[anchors.length - 1].y} L 0 ${canvasHeight} Z" stroke="blue" fill="none" stroke-width="2"/>\n</svg>`;
+  svg += `L${anchors[anchors.length - 1].x + deltaX} ${anchors[anchors.length - 1].y} `;
+  svg += `L0 ${canvasHeight} Z" stroke="blue" fill="none" stroke-width="2"/></svg>`;
 
-  const base64 = btoa(unescape(encodeURIComponent(svg)));
-  const url = `/view?data=${base64}`;
-  window.open(url, "_blank");
+  try {
+    const res = await fetch("/.netlify/functions/share-svg", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ svg }),
+    });
+    const data = await res.json();
+    if (data.url) {
+      window.open(data.url, "_blank");
+    } else {
+      alert("Error sharing SVG");
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Error sharing SVG");
+  }
 };
+
 
 
   return (
@@ -488,11 +512,12 @@ const shareSVG = () => {
           {tool === "delete" ? "Exit Delete" : "Delete Point"}
         </button>
         <button
-  onClick={shareSVG}
-  style={{ ...buttonStyle("#6f42c1"), marginLeft: 10 }}
->
-  Share SVG
-</button>
+          onClick={shareSVG}
+          style={{ ...buttonStyle("#17a2b8"), marginLeft: 10 }}
+        >
+          Share
+        </button>
+
 
       </div>
 

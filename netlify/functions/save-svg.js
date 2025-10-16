@@ -13,8 +13,11 @@ export const handler = async (event) => {
     await fs.writeFile(filePath, svgContent, "utf8");
 
     return {
-      statusCode: 200,
-      body: JSON.stringify({ success: true }),
+        statusCode: 200,
+        headers: {
+            "Content-Type": "image/svg+xml",
+        },
+        body: svgString,
     };
   } catch (err) {
     return { statusCode: 500, body: `Error: ${err.message}` };
